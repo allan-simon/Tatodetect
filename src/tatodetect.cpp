@@ -39,6 +39,8 @@
 #include "tatodetect.h"
 #include "generics/Languages.h"
 
+// TODO may be replacing this by a paramter in the config.js
+// and an attribute in the Config singleton
 #define DEFAULT_INTERFACE_LANG "en"
 
 namespace apps {
@@ -48,9 +50,11 @@ namespace apps {
  */
 Tatodetect::Tatodetect(cppcms::service &serv) :
     cppcms::application(serv),
+    detectsApi(serv),
     pages(serv)
 {
 
+    add(detectsApi, "^/api/detects(.*)", 1);
     //add(sentencesApi, "^/api/sentences(.*)", 1);
     //NOTE important to add the page controller at the end
     //as its regexp is more global
@@ -66,6 +70,7 @@ Tatodetect::Tatodetect(cppcms::service &serv) :
 
 void Tatodetect::main(std::string url) {
     
+    // TODO: encapsulate this in a method
     std::string interfaceLang("");
     if (!session().is_set("interfaceLang")) {
         interfaceLang = get_default_interface_lang();

@@ -13,6 +13,7 @@ file(
     controllers_files
     src/controllers/*
     src/controllers/webs/*
+    src/controllers/apis/*
     src/controllers/generics/*
 )
 
@@ -58,6 +59,7 @@ add_executable(
 
 target_link_libraries(
     tatodetect
+    boost_locale
     cppcms
     cppdb
     booster
@@ -86,7 +88,9 @@ add_custom_command(
     OUTPUT view_web.cpp
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/cppcms_tmpl_cc 
         ${CMAKE_CURRENT_SOURCE_DIR}/src/views/web/*/*.tmpl 
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/views/api/*/*.tmpl 
         -o view_web.cpp
     DEPENDS
         ${CMAKE_CURRENT_SOURCE_DIR}/src/views/web/*/*.tmpl 
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/views/api/*/*.tmpl 
 )

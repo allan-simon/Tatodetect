@@ -36,6 +36,7 @@
 #include <cppdb/frontend.h>
 
 #include "controllers/webs/Pages.h"
+#include "controllers/apis/Detects.h"
 
 /** 
  * @namespace apps
@@ -51,6 +52,7 @@ class Tatodetect : public cppcms::application {
 
 private:
     controllers::webs::Pages pages;
+    controllers::apis::Detects detectsApi;
 
     /**
      * @brief Based on http header, we will try to guess the most suitable
