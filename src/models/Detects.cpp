@@ -32,12 +32,29 @@
 
 #include "models/Detects.h"
 
-bool compare(
- const std::pair<std::string, int> &p1,
- const std::pair<std::string, int> &p2
+
+// simply use for debug purpose
+template <class T> void dump_map(
+    const std::map<std::string, T>& map
+) {
+
+  for ( typename std::map<std::string,T>::const_iterator it = map.begin(); it != map.end(); it++) {
+    std::cout << "Key: " << it->first; 
+    std::cout << "\tValue :" << it->second << std::endl;
+  }
+};
+
+
+
+template <class T> bool compare(
+ const std::pair<std::string, T> &p1,
+ const std::pair<std::string, T> &p2
 ) {
     return p1.second < p2.second;
 };
+
+
+
 
 
 namespace models {
@@ -59,7 +76,7 @@ const std::string Detects::simple(
     const std::string &user
 ) {
 
-    std::cout << "[NOTICE] query" << query << std::endl;
+    //std::cout << "[NOTICE] query" << query << std::endl;
     std::set<std::string> userLangs;
     if (!user.empty()) {
         userLangs = get_user_langs(user);
@@ -165,7 +182,7 @@ const std::string Detects::detects_n_gram(
     std::map<std::string, int> score;
     // will contain a score based on the frequency of
     // the ngrams in the language
-    std::map<std::string, int> percentScore;
+    std::map<std::string, float> percentScore;
     std::map<std::string, int> uniqLangs;
 
     std::string tableName = "grams" + std::to_string(ngramSize);
@@ -190,9 +207,11 @@ const std::string Detects::detects_n_gram(
             // appears in
             int ngramInXLangs = 0;
             int tmpHit = 0;
-            int tmpPercent  = 0;
+            float tmpPercent  = 0.0;
             std::string tmpLang = "";
             std::string lastFoundLang = "";
+
+            //std::cout << "[NOTICE]ngram :" << ngram << std::endl;
             while (res.next()) {
 
                 tmpLang = res.get<std::string>("lang");
@@ -201,9 +220,12 @@ const std::string Detects::detects_n_gram(
                     userLangs.empty() ||
                     userLangs.find(tmpLang) != userLangs.end()
                 ) {
+
+                    //std::cout << "lang: " << tmpLang << std::endl;
                     lastFoundLang = tmpLang;
                     tmpHit = res.get<int>("hit");
-                    tmpPercent = res.get<int>("percent");
+                    tmpPercent = res.get<float>("percent");
+
 
 
                     score[tmpLang] += tmpHit;
@@ -220,9 +242,11 @@ const std::string Detects::detects_n_gram(
                 // we had this language to the list of languages
                 // that have at least one ngram that is uniq
                 // to that language
+
+                //std::cout << "uniq in " << lastFoundLang << std::endl;
                 uniqLangs[lastFoundLang] +=1;
                
-                score[lastFoundLang] += tmpHit*tmpHit*50;
+                score[lastFoundLang] += tmpHit*tmpHit*100;
                 percentScore[lastFoundLang] += tmpPercent*(1+tmpPercent)*100;
 
             }
@@ -246,35 +270,42 @@ const std::string Detects::detects_n_gram(
         return "unknown";
     }
 
+
+    //dump_map<float>(percentScore);
+    //std::cout << std::endl;
+    //dump_map<int>(score);
+    
     // we get the language that have the best frequency score
-    std::pair<std::string, int> maxRelP = *std::max_element(
+    std::pair<std::string, float> maxRelP = *std::max_element(
         percentScore.begin(),
         percentScore.end(),
-        compare
+        compare<float>
     );
 
     // we get the language having the best absolute score
     std::pair<std::string, int> maxAbsP = *std::max_element(
         score.begin(),
         score.end(),
-        compare
+        compare<int>
     );
 
 
     std::string maxRelLang = maxRelP.first;
     std::string maxAbsLang = maxAbsP.first;
 
+    //std::cout << "max relative:" << maxRelLang << std::endl;
+    //std::cout << "max absolute:" << maxAbsLang << std::endl;
 
     // we get relative (percent) score of the language having the
     // maximun absolute score
-    int maxRelAbsScore = score[maxRelLang];
+    float maxRelAbsScore = score[maxRelLang];
     // we get the absolute score of the language having the maximun
     // absolute score
-    int maxAbsAbsScore = maxAbsP.second;
+    float maxAbsAbsScore = maxAbsP.second;
 
     // we do the same for the language with the best relative score
-    int maxAbsRelScore = percentScore[maxAbsLang];
-    int maxRelRelScore = maxRelP.second;
+    float maxAbsRelScore = percentScore[maxAbsLang];
+    float maxRelRelScore = maxRelP.second;
 
     // after we compare how these two languages perfom in the other
     // way, and we will take the one that perform the less "bad"
@@ -290,8 +321,11 @@ const std::string Detects::detects_n_gram(
     }
 
     if (ratioAbs > ratioRel) {
+
+        //std::cout << "detected:" << maxAbsLang << std::endl;
         return maxAbsLang;
     }
+    //std::cout << "detected:" << maxRelLang << std::endl;
     return maxRelLang;
 
 }
