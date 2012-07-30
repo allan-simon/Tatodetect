@@ -58,6 +58,8 @@ const std::string Detects::simple(
     const std::string &query,
     const std::string &user
 ) {
+
+    std::cout << "[NOTICE] query" << query << std::endl;
     std::set<std::string> userLangs;
     if (!user.empty()) {
         userLangs = get_user_langs(user);
@@ -77,7 +79,7 @@ const std::string Detects::simple(
         if (detected == "unknown") {
             detected = detects_n_gram(
                 query,
-                3
+                2
             );
         }
     }
@@ -190,6 +192,7 @@ const std::string Detects::detects_n_gram(
             int tmpHit = 0;
             int tmpPercent  = 0;
             std::string tmpLang = "";
+            std::string lastFoundLang = "";
             while (res.next()) {
 
                 tmpLang = res.get<std::string>("lang");
@@ -198,6 +201,7 @@ const std::string Detects::detects_n_gram(
                     userLangs.empty() ||
                     userLangs.find(tmpLang) != userLangs.end()
                 ) {
+                    lastFoundLang = tmpLang;
                     tmpHit = res.get<int>("hit");
                     tmpPercent = res.get<int>("percent");
 
@@ -216,10 +220,10 @@ const std::string Detects::detects_n_gram(
                 // we had this language to the list of languages
                 // that have at least one ngram that is uniq
                 // to that language
-                uniqLangs[tmpLang] +=1;
+                uniqLangs[lastFoundLang] +=1;
                
-                score[tmpLang] += tmpHit*tmpHit*50;
-                percentScore[tmpLang] += tmpPercent*(1+tmpPercent)*100;
+                score[lastFoundLang] += tmpHit*tmpHit*50;
+                percentScore[lastFoundLang] += tmpPercent*(1+tmpPercent)*100;
 
             }
 
@@ -256,8 +260,10 @@ const std::string Detects::detects_n_gram(
         compare
     );
 
+
     std::string maxRelLang = maxRelP.first;
     std::string maxAbsLang = maxAbsP.first;
+
 
     // we get relative (percent) score of the language having the
     // maximun absolute score
