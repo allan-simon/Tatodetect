@@ -133,7 +133,7 @@ const std::string Detects::detects_n_gram(
     using namespace boost::locale;
     generator gen;
     // Make system default locale global
-    std::locale loc = gen("");
+    std::locale loc = gen("en_US.UTF8");
     std::locale::global(loc); 
     std::cout.imbue(loc);
  
