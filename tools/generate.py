@@ -141,7 +141,7 @@ def generate_n_grams():
         user = cols[3]
 
         # we ignore the sentence with an unset language
-        if lang == '\N':
+        if lang == '\N' or lang == '':
             continue
 
         userLangNbrNgram[(user,lang)] += len(text)
