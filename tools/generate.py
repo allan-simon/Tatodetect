@@ -1,5 +1,30 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+#
+#Tatoeba Project, free collaborative creation of multilingual corpuses project
+#Copyright (C) 2012 Allan SIMON <allan.simon@supinfo.com>
+#
+#This program is free software: you can redistribute it and/or modify
+#it under the terms of the GNU Affero General Public License as published by
+#the Free Software Foundation, either version 3 of the License, or
+#(at your option) any later version.
+#
+#This program is distributed in the hope that it will be useful,
+#but WITHOUT ANY WARRANTY; without even the implied warranty of
+#MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#GNU Affero General Public License for more details.
+#
+#You should have received a copy of the GNU Affero General Public License
+#along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
+#@category Tatodetect
+#@package  Tools
+#@author   Allan SIMON <allan.simon@supinfo.com>
+#@license  Affero General Public License
+#@link     http://tatoeba.org
+#
+
 import codecs
 import os
 import sqlite3
@@ -23,7 +48,7 @@ NGRAM_FREQ_LIMIT = 0.00001
 # number of 1-gram a user must have submitted in one language to
 # be considered as possibly contributing in that languages
 # NOTE: this number is currently purely arbitrary
-USR_LANG_LIMIT = 142
+USR_LANG_LIMIT = 400
 # we will generate the ngram from 2-gram to X-grams
 UP_TO_N_GRAM = 5
 # some names of the table in the database
