@@ -141,7 +141,7 @@ def generate_n_grams():
         user = cols[3]
 
         # we ignore the sentence with an unset language
-        if lang == '\N' or lang == '':
+        if lang == '\\N' or lang == '':
             continue
 
         userLangNbrNgram[(user,lang)] += len(text)
@@ -235,8 +235,10 @@ def create_indexes_db():
 
 
 # we first delete the old database
-os.remove(DB)
+if (os.path.isfile(DB)):
+    os.remove(DB)
 # we download the file we will use
+print("Start downloading...")
 urllib.request.urlretrieve(
     URL_DL_FILES + SENTENCES_DETAILED,
     DB_DIR + SENTENCES_DETAILED
@@ -244,7 +246,11 @@ urllib.request.urlretrieve(
 
 print("Download Finish")
 
+print("Start generating database...")
 generate_db()
+
+print("generating n-grams...")
 generate_n_grams()
 
+print("creating indexes...")
 create_indexes_db()
