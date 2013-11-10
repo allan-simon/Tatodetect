@@ -24,7 +24,7 @@
  */ 
 
 #include <set>
-#include <boost/locale.hpp>
+#include <booster/locale.h>
 #include "models/SqliteModel.h"
 namespace models {
 
@@ -77,7 +77,7 @@ class Detects : public SqliteModel {
          *
          */
         const std::string get_n_gram(
-            const boost::locale::boundary::ssegment_index::iterator & start,
+            const booster::locale::boundary::ssegment_index::iterator & start,
             const int size
         );
 

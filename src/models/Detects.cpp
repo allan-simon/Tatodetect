@@ -147,7 +147,7 @@ const std::string Detects::detects_n_gram(
 ) {
 
 
-    using namespace boost::locale;
+    using namespace booster::locale;
     generator gen;
     // Make system default locale global
     std::locale loc = gen("en_US.UTF8");
@@ -334,10 +334,10 @@ const std::string Detects::detects_n_gram(
  *
  */
 const std::string Detects::get_n_gram(
-    const boost::locale::boundary::ssegment_index::iterator & start,
+    const booster::locale::boundary::ssegment_index::iterator & start,
     const int size
 ) {
-    using namespace boost::locale;
+    using namespace booster::locale;
     std::string ngram = "";
     boundary::ssegment_index::iterator ngramIt;
     int i = 0;

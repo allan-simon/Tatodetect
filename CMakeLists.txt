@@ -5,6 +5,20 @@ include_directories(
     src
 )
 
+# set the version
+set(PROJECT_VERSION "0.2")
+
+set(ARCHIVE_NAME ${CMAKE_PROJECT_NAME}-${PROJECT_VERSION})
+add_custom_target(
+    dist
+    COMMAND git archive --prefix=${ARCHIVE_NAME}/ HEAD
+        | bzip2 > ${CMAKE_BINARY_DIR}/${ARCHIVE_NAME}.tar.bz2
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+
+#set(CMAKE_CXX_COMPILER "/usr/bin/clang++")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 
 
 
@@ -59,30 +73,11 @@ add_executable(
 
 target_link_libraries(
     tatodetect
-    boost_locale
     cppcms
     cppdb
     booster
     sqlite3
 )
-
-#add_executable(
-#    indexer
-#    src/indexer.cpp
-#    src/contents/Config.cpp
-#    src/generics/Languages.cpp
-#    src/models/TatoDB.cpp
-#)
-
-#target_link_libraries(
-#    indexer
-#    tato
-#    cppcms
-#    cppdb
-#    tokyodystopia
-#)
-#
-
 
 add_custom_command(
     OUTPUT view_web.cpp
