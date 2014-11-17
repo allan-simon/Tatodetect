@@ -134,11 +134,17 @@ def generate_n_grams():
         'r',
         encoding='utf-8'
     )
+    lineNumber = 0
     for line in input:
-        cols = line[:-1].split("\t")
-        lang = cols[1]
-        text = cols[2]
-        user = cols[3]
+        lineNumber += 1
+        try:
+            cols = line[:-1].split("\t")
+            lang = cols[1]
+            text = cols[2]
+            user = cols[3]
+        except IndexError:
+            print(u'Skipped erroneous line {}: {}'.format(lineNumber, line))
+            continue
 
         # we ignore the sentence with an unset language
         if lang == '\\N' or lang == '':
