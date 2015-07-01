@@ -32,7 +32,7 @@ from collections import defaultdict
 import urllib.request
 
 # where to download the file
-URL_DL_FILES = "http://tatoeba.org/app/webroot/files/downloads/"
+URL_DL_FILES = "http://downloads.tatoeba.org/exports/"
 # name of the file to download
 SENTENCES_DETAILED = "sentences_detailed.csv"
 #where the database will be saved
