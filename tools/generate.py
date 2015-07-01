@@ -143,7 +143,7 @@ def generate_n_grams():
             text = cols[2]
             user = cols[3]
         except IndexError:
-            print(u'Skipped erroneous line {}: {}'.format(lineNumber, line))
+            print('Skipped erroneous line {}: {}'.format(lineNumber, line))
             continue
 
         # we ignore the sentence with an unset language
