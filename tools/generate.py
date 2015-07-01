@@ -32,7 +32,7 @@ from collections import defaultdict
 import urllib.request
 
 # where to download the file
-URL_DL_FILES = "http://tatoeba.org/app/webroot/files/downloads/"
+URL_DL_FILES = "http://downloads.tatoeba.org/exports/"
 # name of the file to download
 SENTENCES_DETAILED = "sentences_detailed.csv"
 #where the database will be saved
@@ -143,7 +143,7 @@ def generate_n_grams():
             text = cols[2]
             user = cols[3]
         except IndexError:
-            print(u'Skipped erroneous line {}: {}'.format(lineNumber, line))
+            print('Skipped erroneous line {}: {}'.format(lineNumber, line))
             continue
 
         # we ignore the sentence with an unset language
