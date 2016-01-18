@@ -28,15 +28,8 @@
 import codecs
 import os
 import sqlite3
+import sys
 from collections import defaultdict
-import urllib.request
-
-# where to download the file
-URL_DL_FILES = "http://downloads.tatoeba.org/exports/"
-# name of the file to download
-SENTENCES_DETAILED = "sentences_detailed.csv"
-#where the database will be saved
-DB_DIR = "../data/"
 
 # languages that don't use an alphabet
 # we put them apart as they are likely to have a lot of different
@@ -55,16 +48,14 @@ UP_TO_N_GRAM = 5
 TABLE_NGRAM = "grams"
 TABLE_STAT = "langstat"
 TABLE_USR_STAT = "users_langs"
-# database file name
-DB = DB_DIR + 'ngrams.db'
 INSERT_NGRAM = "INSERT INTO %s VALUES (?,?,?,?);"
 INSERT_USR_STAT = "INSERT INTO %s VALUES (?,?,?);"
 
 
 # create the database and all the required tables 
-def generate_db():
+def generate_db(database):
 
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(database)
     conn.row_factory = sqlite3.Row;
     c = conn.cursor()
 
@@ -99,10 +90,10 @@ def generate_db():
 
 
 
-def generate_n_grams():
+def generate_n_grams(database, sentences_detailed):
 
     #tableStat = TABLE_STAT + str(size)
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(database)
     conn.isolation_level="EXCLUSIVE"
     conn.row_factory = sqlite3.Row;
     c = conn.cursor()
@@ -130,7 +121,7 @@ def generate_n_grams():
 
     userLangNbrNgram = defaultdict(lambda: 0)
     input = codecs.open(
-        DB_DIR + SENTENCES_DETAILED,
+        sentences_detailed,
         'r',
         encoding='utf-8'
     )
@@ -196,8 +187,8 @@ def generate_n_grams():
     c.close()
 
 # create indexes on the database to make request faster
-def create_indexes_db():
-    conn = sqlite3.connect(DB)
+def create_indexes_db(database):
+    conn = sqlite3.connect(database)
     conn.isolation_level="EXCLUSIVE"
     conn.row_factory = sqlite3.Row;
     c = conn.cursor()
@@ -239,24 +230,22 @@ def create_indexes_db():
     conn.commit()
     c.close()
 
+if len(sys.argv) != 3:
+    print("Usage: {} <sentences_detailed.csv> <ngrams.db>".format(sys.argv[0]))
+    sys.exit(1)
+
+sentences_detailed = sys.argv[1]
+database = sys.argv[2]
 
 # we first delete the old database
-if (os.path.isfile(DB)):
-    os.remove(DB)
-# we download the file we will use
-print("Start downloading...")
-urllib.request.urlretrieve(
-    URL_DL_FILES + SENTENCES_DETAILED,
-    DB_DIR + SENTENCES_DETAILED
-)
-
-print("Download Finish")
+if (os.path.isfile(database)):
+    os.remove(database)
 
 print("Start generating database...")
-generate_db()
+generate_db(database)
 
 print("generating n-grams...")
-generate_n_grams()
+generate_n_grams(database, sentences_detailed)
 
 print("creating indexes...")
-create_indexes_db()
+create_indexes_db(database)
