@@ -19,6 +19,11 @@
 - name: Extract source from the archive
   command: tar -jxvf cppcms-1.0.5.tar.bz2 chdir=/tmp/
   when: install_state is failed or force_install == true
+- name: Disable testing
+  replace:
+    path: '/tmp/cppcms-1.0.5/CMakeLists.txt'
+    regexp: "^(enable_testing\\(\\))$"
+    replace: "#\\1"
 - name: Generate makefile
   command: cmake . chdir=/tmp/cppcms-1.0.5
 - name: Compile
