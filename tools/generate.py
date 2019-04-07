@@ -106,7 +106,7 @@ def generate_n_grams(database, sentences_detailed):
     c.execute('PRAGMA journal_mode=MEMORY;')
 
     userLangNbrNgram = defaultdict(lambda: 0)
-    for size in range(2, UP_TO_N_GRAM+1):
+    for size in range(UP_TO_N_GRAM, 1, -1):
         hyperLangNgram = defaultdict(
             lambda: defaultdict(lambda: 0)
         )
