@@ -105,64 +105,50 @@ def generate_n_grams(database, sentences_detailed):
     c.execute('PRAGMA temp_store=MEMORY;')
     c.execute('PRAGMA journal_mode=MEMORY;')
 
-    hyperLangNgram = []
-    hyperLangNbrNgram = []
-
-    for size in range(2,UP_TO_N_GRAM+1):
-        hyperLangNbrNgram.append( 
-            defaultdict(lambda: 0)
-        )
-        # lang => ngram => hit
-        hyperLangNgram.append(
-            defaultdict(
-                lambda: defaultdict(lambda: 0)
-            )
-        )
-
     userLangNbrNgram = defaultdict(lambda: 0)
-    input = codecs.open(
-        sentences_detailed,
-        'r',
-        encoding='utf-8'
-    )
-    lineNumber = 0
-    for line in input:
-        lineNumber += 1
-        try:
-            cols = line[:-1].split("\t")
-            lang = cols[1]
-            text = cols[2]
-            user = cols[3]
-        except IndexError:
-            print('Skipped erroneous line {}: {}'.format(lineNumber, line))
-            continue
+    for size in range(2, UP_TO_N_GRAM+1):
+        hyperLangNgram = defaultdict(
+            lambda: defaultdict(lambda: 0)
+        )
+        hyperLangNbrNgram = defaultdict(lambda: 0)
 
-        # we ignore the sentence with an unset language
-        if lang == '\\N' or lang == '':
-            continue
+        input = codecs.open(
+            sentences_detailed,
+            'r',
+            encoding='utf-8'
+        )
 
-        userLangNbrNgram[(user,lang)] += len(text)
-        for size in range(2,UP_TO_N_GRAM+1):
-            j = size - 2
+        lineNumber = 0
+        for line in input:
+            lineNumber += 1
+            try:
+                cols = line[:-1].split("\t")
+                lang = cols[1]
+                text = cols[2]
+                user = cols[3]
+            except IndexError:
+                print('Skipped erroneous line {}: {}'.format(lineNumber, line))
+                continue
+
+            # we ignore the sentence with an unset language
+            if lang == '\\N' or lang == '':
+                continue
+
+            userLangNbrNgram[(user,lang)] += len(text)
             nbrNgramLine = len(text) - size
             if nbrNgramLine > 0:
-                hyperLangNbrNgram[j][lang] += nbrNgramLine
-                currentLangNgram = hyperLangNgram[j][lang]
+                hyperLangNbrNgram[lang] += nbrNgramLine
                 for i in range(nbrNgramLine+1):
                     ngram = text[i:i+size]
-                    currentLangNgram[ngram] += 1
+                    hyperLangNgram[lang][ngram] += 1
 
 
-    for i in range(0,UP_TO_N_GRAM-1):
 
-        size = i + 2
         table = TABLE_NGRAM + str(size)
         
-        langNgram = hyperLangNgram[i]
-        langNbrNgram = hyperLangNbrNgram[i]
-        for lang, currentLangNgram in langNgram.items():
+        for lang, currentLangNgram in hyperLangNgram.items():
             for ngram,hit in currentLangNgram.items():
-                freq = float(hit) / langNbrNgram[lang]
+                freq = float(hit) / hyperLangNbrNgram[lang]
 
                 if lang in IDEOGRAM_LANGS:
                     if freq > IDEOGRAM_NGRAM_FREQ_LIMIT:
