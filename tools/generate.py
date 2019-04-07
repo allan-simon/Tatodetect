@@ -145,11 +145,12 @@ def generate_n_grams(database, sentences_detailed):
         for size in range(2,UP_TO_N_GRAM+1):
             j = size - 2
             nbrNgramLine = len(text) - size
-            hyperLangNbrNgram[j][lang] += nbrNgramLine
-            currentLangNgram = hyperLangNgram[j][lang]
-            for i in range(nbrNgramLine+1):
-                ngram = text[i:i+size]
-                currentLangNgram[ngram][0] += 1
+            if nbrNgramLine > 0:
+                hyperLangNbrNgram[j][lang] += nbrNgramLine
+                currentLangNgram = hyperLangNgram[j][lang]
+                for i in range(nbrNgramLine+1):
+                    ngram = text[i:i+size]
+                    currentLangNgram[ngram] += 1
 
 
     for i in range(0,UP_TO_N_GRAM-1):
