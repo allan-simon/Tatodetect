@@ -112,10 +112,10 @@ def generate_n_grams(database, sentences_detailed):
         hyperLangNbrNgram.append( 
             defaultdict(lambda: 0)
         )
-        # lang => ngram => (hit,percent)
+        # lang => ngram => hit
         hyperLangNgram.append(
             defaultdict(
-                lambda: defaultdict(lambda: [0,0])
+                lambda: defaultdict(lambda: 0)
             )
         )
 
@@ -160,8 +160,7 @@ def generate_n_grams(database, sentences_detailed):
         langNgram = hyperLangNgram[i]
         langNbrNgram = hyperLangNbrNgram[i]
         for lang, currentLangNgram in langNgram.items():
-            for ngram,tuple in currentLangNgram.items():
-                hit = tuple[0]
+            for ngram,hit in currentLangNgram.items():
                 freq = float(hit) / langNbrNgram[lang]
 
                 if lang in IDEOGRAM_LANGS:
