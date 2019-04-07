@@ -76,7 +76,9 @@ const std::string Detects::simple(
     const std::string &user
 ) {
 
-    //std::cout << "[NOTICE] query" << query << std::endl;
+#ifdef DEBUG
+    std::cout << "[NOTICE] query" << query << std::endl;
+#endif
     std::set<std::string> userLangs;
     if (!user.empty()) {
         userLangs = get_user_langs(user);
@@ -211,7 +213,9 @@ const std::string Detects::detects_n_gram(
             std::string tmpLang = "";
             std::string lastFoundLang = "";
 
-            //std::cout << "[NOTICE]ngram :" << ngram << std::endl;
+#ifdef DEBUG
+            std::cout << "[NOTICE]ngram :" << ngram << std::endl;
+#endif
             while (res.next()) {
 
                 tmpLang = res.get<std::string>("lang");
@@ -221,11 +225,12 @@ const std::string Detects::detects_n_gram(
                     userLangs.find(tmpLang) != userLangs.end()
                 ) {
 
-                    //std::cout << "lang: " << tmpLang << std::endl;
+#ifdef DEBUG
+                    std::cout << "lang: " << tmpLang << std::endl;
+#endif
                     lastFoundLang = tmpLang;
                     tmpHit = res.get<int>("hit");
                     tmpPercent = res.get<float>("percent");
-
 
 
                     score[tmpLang] += tmpHit;
@@ -237,13 +242,14 @@ const std::string Detects::detects_n_gram(
             // if the ngram appears only in one language
             // then we apply to it a bonus as this ngram is more
             // significant to help guess which language it is
-
             if (ngramInXLangs == 1) {
                 // we had this language to the list of languages
                 // that have at least one ngram that is uniq
                 // to that language
 
-                //std::cout << "uniq in " << lastFoundLang << std::endl;
+#ifdef DEBUG
+                std::cout << "uniq in " << lastFoundLang << std::endl;
+#endif
                 uniqLangs[lastFoundLang] +=1;
                
                 score[lastFoundLang] += tmpHit*tmpHit*100;
@@ -271,10 +277,12 @@ const std::string Detects::detects_n_gram(
     }
 
 
-    //dump_map<float>(percentScore);
-    //std::cout << std::endl;
-    //dump_map<int>(score);
-    
+#ifdef DEBUG
+    dump_map<float>(percentScore);
+    std::cout << std::endl;
+    dump_map<int>(score);
+#endif
+
     // we get the language that have the best frequency score
     std::pair<std::string, float> maxRelP = *std::max_element(
         percentScore.begin(),
@@ -293,8 +301,10 @@ const std::string Detects::detects_n_gram(
     std::string maxRelLang = maxRelP.first;
     std::string maxAbsLang = maxAbsP.first;
 
-    //std::cout << "max relative:" << maxRelLang << std::endl;
-    //std::cout << "max absolute:" << maxAbsLang << std::endl;
+#ifdef DEBUG
+    std::cout << "max relative:" << maxRelLang << std::endl;
+    std::cout << "max absolute:" << maxAbsLang << std::endl;
+#endif
 
     // we get relative (percent) score of the language having the
     // maximun absolute score
@@ -322,10 +332,14 @@ const std::string Detects::detects_n_gram(
 
     if (ratioAbs > ratioRel) {
 
-        //std::cout << "detected:" << maxAbsLang << std::endl;
+#ifdef DEBUG
+        std::cout << "detected:" << maxAbsLang << std::endl;
+#endif
         return maxAbsLang;
     }
-    //std::cout << "detected:" << maxRelLang << std::endl;
+#ifdef DEBUG
+    std::cout << "detected:" << maxRelLang << std::endl;
+#endif
     return maxRelLang;
 
 }
