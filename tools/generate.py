@@ -163,6 +163,8 @@ def generate_n_grams(database, sentences_detailed):
                             INSERT_NGRAM % (table),
                             (ngram,lang,hit,freq)
                             )
+            conn.commit()
+
     for (user,lang),hit in userLangNbrNgram.items():
         if hit > USR_LANG_LIMIT:
             c.execute(
