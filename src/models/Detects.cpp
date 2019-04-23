@@ -150,12 +150,7 @@ const std::string Detects::detects_n_gram(
 
 
     using namespace booster::locale;
-    generator gen;
-    // Make system default locale global
-    std::locale loc = gen("en_US.UTF8");
-    std::locale::global(loc); 
-    std::cout.imbue(loc);
- 
+
     boundary::ssegment_index index(
         boundary::word,
         query.begin(),

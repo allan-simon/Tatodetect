@@ -25,7 +25,7 @@
 
 
 #include <iostream>
-
+#include <booster/locale.h>
 
 #include <cppcms/service.h>
 #include <cppcms/applications_pool.h>
@@ -41,6 +41,13 @@ using namespace cppcms;
 
 int main(int argc,char ** argv)
 {
+    booster::locale::generator gen;
+
+    // Make system default locale global
+    std::locale loc = gen("en_US.UTF8");
+    std::locale::global(loc);
+    std::cout.imbue(loc);
+
     //TODO send notice message to logs instead of cout
 
     service app(argc, argv);
