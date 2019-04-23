@@ -87,10 +87,22 @@ def generate_db(database):
     conn.commit()
     c.close()
 
+def sentencesWithTag(tagsFile, tagName):
+    tagged = {}
+    with open(tagsFile) as fp:
+        for line in fp:
+            try:
+                cols = line[:-1].split("\t")
+                sentenceId  = cols[0]
+                sentenceTag = cols[1]
+                if sentenceTag == tagName:
+                    tagged[sentenceId] = True
+            except IndexError:
+                pass
 
+    return tagged
 
-
-def generate_n_grams(database, sentences_detailed):
+def generate_n_grams(database, sentences_detailed, tags):
 
     #tableStat = TABLE_STAT + str(size)
     conn = sqlite3.connect(database)
@@ -104,6 +116,10 @@ def generate_n_grams(database, sentences_detailed):
     c.execute('PRAGMA count_changes=OFF;')
     c.execute('PRAGMA temp_store=MEMORY;')
     c.execute('PRAGMA journal_mode=MEMORY;')
+
+    wrongFlags = {}
+    if tags:
+        wrongFlags = sentencesWithTag(tags, '@change flag')
 
     userLangNbrNgram = defaultdict(lambda: 0)
     for size in range(UP_TO_N_GRAM, 1, -1):
@@ -123,6 +139,7 @@ def generate_n_grams(database, sentences_detailed):
             lineNumber += 1
             try:
                 cols = line[:-1].split("\t")
+                sentenceId = cols[0]
                 lang = cols[1]
                 text = cols[2]
                 user = cols[3]
@@ -132,6 +149,10 @@ def generate_n_grams(database, sentences_detailed):
 
             # we ignore the sentence with an unset language
             if lang == '\\N' or lang == '':
+                continue
+
+            # we ignore the sentence with wrong flag
+            if sentenceId in wrongFlags:
                 continue
 
             userLangNbrNgram[(user,lang)] += len(text)
@@ -218,12 +239,16 @@ def create_indexes_db(database):
     conn.commit()
     c.close()
 
-if len(sys.argv) != 3:
-    print("Usage: {} <sentences_detailed.csv> <ngrams.db>".format(sys.argv[0]))
+if len(sys.argv) < 3:
+    print("Usage: {} <sentences_detailed.csv> <ngrams.db> [tags.csv]".format(sys.argv[0]))
     sys.exit(1)
 
 sentences_detailed = sys.argv[1]
 database = sys.argv[2]
+try:
+    tags = sys.argv[3]
+except IndexError:
+    tags = None
 
 # we first delete the old database
 if (os.path.isfile(database)):
@@ -233,7 +258,7 @@ print("Start generating database...")
 generate_db(database)
 
 print("generating n-grams...")
-generate_n_grams(database, sentences_detailed)
+generate_n_grams(database, sentences_detailed, tags)
 
 print("creating indexes...")
 create_indexes_db(database)
