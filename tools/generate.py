@@ -117,6 +117,12 @@ def generate_n_grams(database, sentences_detailed, tags):
     c.execute('PRAGMA temp_store=MEMORY;')
     c.execute('PRAGMA journal_mode=MEMORY;')
 
+    input = codecs.open(
+        sentences_detailed,
+        'r',
+        encoding='utf-8'
+    )
+
     wrongFlags = {}
     if tags:
         wrongFlags = sentencesWithTag(tags, '@change flag')
@@ -128,13 +134,8 @@ def generate_n_grams(database, sentences_detailed, tags):
         )
         hyperLangNbrNgram = defaultdict(lambda: 0)
 
-        input = codecs.open(
-            sentences_detailed,
-            'r',
-            encoding='utf-8'
-        )
-
         lineNumber = 0
+        input.seek(0)
         for line in input:
             lineNumber += 1
             try:
