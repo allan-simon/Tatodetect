@@ -42,8 +42,6 @@ class Detects : public SqliteModel {
          * @brief Will detect the lang based on a n-gram splitting of the query
          *
          * @param query     the text to detect the lang of
-         * @param ngramSize the size of the n-gram in which the text will be
-         *                  split
          * @param userLangs In order to provide more accurate results, list of
          *                  language the user speaks
          *
@@ -52,9 +50,9 @@ class Detects : public SqliteModel {
          */
         const std::string detects_n_gram(
             const std::string &query,
-            const int ngramSize,
             const std::set<std::string> &userLangs = std::set<std::string>()
         );
+
         /**
          * @brief Retrieve the list of languages spoken by a given user
          *
@@ -102,7 +100,6 @@ class Detects : public SqliteModel {
             const std::string &query,
             const std::string &user = ""
         );
-         
 };
 
 } // end namespace models 
