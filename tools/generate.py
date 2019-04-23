@@ -102,6 +102,10 @@ def sentencesWithTag(tagsFile, tagName):
 
     return tagged
 
+def print_status_line(size, lineNumber):
+    print('\rGenerating ngrams of size {} (reading CSV file... {} lines)'.format(size, lineNumber), end='')
+    sys.stdout.flush()
+
 def generate_n_grams(database, sentences_detailed, tags):
 
     #tableStat = TABLE_STAT + str(size)
@@ -137,6 +141,9 @@ def generate_n_grams(database, sentences_detailed, tags):
         lineNumber = 0
         input.seek(0)
         for line in input:
+            if lineNumber % 10000 == 0:
+                print_status_line(size, lineNumber)
+
             lineNumber += 1
             try:
                 cols = line[:-1].split("\t")
@@ -163,8 +170,11 @@ def generate_n_grams(database, sentences_detailed, tags):
                 for i in range(nbrNgramLine+1):
                     ngram = text[i:i+size]
                     hyperLangNgram[lang][ngram] += 1
+        print_status_line(size, lineNumber)
+        print(' done'.format(lineNumber))
 
 
+        print('Inserting ngrams of size {}...'.format(size))
 
         table = TABLE_NGRAM + str(size)
         
@@ -187,6 +197,7 @@ def generate_n_grams(database, sentences_detailed, tags):
                             )
             conn.commit()
 
+    print('Inserting user stats...')
     for (user,lang),hit in userLangNbrNgram.items():
         if hit > USR_LANG_LIMIT:
             c.execute(
