@@ -67,6 +67,11 @@
 - name: Copy default options file to system-wide location
   copy: src=default dest=/etc/default/tatodetect mode=0644
 
+- name: Create user tatodetect
+  user:
+    name: tatodetect
+    system: yes
+
 - name: Download ngrams.db file
   get_url: url={{ngrams_db_download_url}} dest={{ngrams_db_file}} mode=0644
   when: ngrams_create_mode == "download"
