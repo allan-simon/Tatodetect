@@ -12,7 +12,6 @@
   - g++ 
   - libpcre3-dev
   - zlib1g-dev
-  - libgcrypt11-dev
   - libicu-dev
 - name: Fetch cppcms source
   get_url: url=http://downloads.sourceforge.net/project/cppcms/cppcms/1.0.5/cppcms-1.0.5.tar.bz2 dest=/tmp/
