@@ -5,14 +5,9 @@
   when: install_state is success and force_install == true
   ignore_errors: yes
 - name: Install dependencies for cppcms
-  apt: name={{item}} state=present
-  with_items:
-  - make
-  - cmake 
-  - g++ 
-  - libpcre3-dev
-  - zlib1g-dev
-  - libicu-dev
+  apt:
+    name: ['make', 'cmake', 'g++', 'libpcre3-dev', 'zlib1g-dev', 'libicu-dev']
+    state: present
 - name: Fetch cppcms source
   get_url: url=http://downloads.sourceforge.net/project/cppcms/cppcms/1.0.5/cppcms-1.0.5.tar.bz2 dest=/tmp/
 - name: Extract source from the archive
