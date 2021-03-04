@@ -21,7 +21,7 @@
 - name: Generate makefile
   command: cmake . chdir=/tmp/cppcms-1.0.5
 - name: Compile
-  command: make chdir=/tmp/cppcms-1.0.5
+  command: make -j2 chdir=/tmp/cppcms-1.0.5
 - name: Install
   command: make install chdir=/tmp/cppcms-1.0.5
 - name: Install dependencies for tatodetect
@@ -33,7 +33,7 @@
 - name: Generate makefile
   command: cmake . chdir=/tmp/tatodetect
 - name: Compile
-  command: make chdir=/tmp/tatodetect
+  command: make -j2 chdir=/tmp/tatodetect
 - name: Copy the binary to system-wide location
   command: cp tatodetect /usr/local/bin/tatodetect chdir=/tmp/tatodetect
 - name: Copy the ngrams generation tool to system-wide location
