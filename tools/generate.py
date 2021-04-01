@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-#
 # Tatoeba Project, free collaborative creation of multilingual corpuses project
 # Copyright (C) 2012 Allan SIMON <allan.simon@supinfo.com>
 #
@@ -24,235 +21,325 @@
 # @license  Affero General Public License
 # @link     http://tatoeba.org
 #
-import codecs
-import os
 import sqlite3
 import sys
 from collections import defaultdict
+from pathlib import Path
 
 # languages that don't use an alphabet
 # we put them apart as they are likely to have a lot of different
 # ngrams and by so need to have a lower limit for the ngrams we kept
 # for that languages
-IDEOGRAM_LANGS = frozenset(["wuu", "yue", "cmn"])
+IDEOGRAM_LANGS = ("wuu", "yue", "cmn")
 IDEOGRAM_NGRAM_FREQ_LIMIT = 0.000005
 NGRAM_FREQ_LIMIT = 0.00001
 # number of 1-gram a user must have submitted in one language to
 # be considered as possibly contributing in that languages
-# NOTE: this number is currently purely arbitrary
+# note that this number is currently purely arbitrary
 USR_LANG_LIMIT = 400
 # we will generate the ngram from 2-gram to X-grams
+FROM_N_GRAM = 2
 UP_TO_N_GRAM = 5
 # some names of the table in the database
 TABLE_NGRAM = "grams"
 TABLE_STAT = "langstat"
 TABLE_USR_STAT = "users_langs"
-INSERT_NGRAM = "INSERT INTO %s VALUES (?,?,?,?);"
-INSERT_USR_STAT = "INSERT INTO %s VALUES (?,?,?);"
 
 
-def generate_db(database_path):
-    """Create the database and all the required tables
+class NgramCounterDB:
+    """A sqlite database for tracking:
 
-    Parameters
-    ----------
-    database_path : str
-        the path of the Tatodetect sqlite database
+    The occurrence counts of every n-gram found in the
+    Tatoeba corpus
+
+    Statistics realated to user contributions to Tatoeba
+    in various languages
     """
-    conn = sqlite3.connect(database_path)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
 
-    for size in range(2, UP_TO_N_GRAM + 1):
-        table = TABLE_NGRAM + str(size)
-        c.execute(
-            """
-            CREATE TABLE %s (
-             'gram' text not null,
-             'lang'text not null,
-             'hit'  int not null,
-             'percent' float not null default 0
-            );
-            """
-            % (table)
-        )
-    conn.commit()
-
-    c.execute(
+    def __init__(self, db_path: Path) -> None:
         """
-        CREATE TABLE %s (
-            'user' text not null,
-            'lang' text not null ,
-            'total' int not null default 0
-        );
+        Parameters
+        ----------
+        db_path : Path
+            the location of the sqlite databse
         """
-        % (TABLE_USR_STAT)
-    )
-    conn.commit()
-    c.close()
+        self._fp = db_path
 
+        self._conn = self._init_db()
 
-def generate_n_grams(database_path, sentences_path, tags_path):
-    """Count the occurrences of the ngrams in the Tatoeba corpora
+    def count_ngram_hits(
+        self,
+        sentences_detailed_path: Path,
+        sentence_blacklist: list,
+        buffer_length: int = 5000000,
+    ) -> None:
+        """Count n-grams occurrences for each Tatoeba language
+        A contribution score equal to sum(len(sentences)) * (max_n - 1)
+        is also computed for every language a user contributed to
 
-    Parameters
-    ----------
-    database_path : str
-        the path of the Tatodetect sqlite database
-    sentences : str
-        the path of the Tatoeba 'sentences_detailed.csv' datafile
-    tags_path : str
-        the path of the Tatoeba tags datafile
-    """
-    conn = sqlite3.connect(database_path)
-    conn.isolation_level = "EXCLUSIVE"
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    # some optimization to make it faster
-    c.execute("PRAGMA page_size=627680;")
-    c.execute("PRAGMA default_cache_size=320000;")
-    c.execute("PRAGMA synchronous=OFF;")
-    c.execute("PRAGMA count_changes=OFF;")
-    c.execute("PRAGMA temp_store=MEMORY;")
-    c.execute("PRAGMA journal_mode=MEMORY;")
+        All results are gradually saved into database tables
 
-    input = codecs.open(sentences_path, "r", encoding="utf-8")
+        Parameters
+        ----------
+        sentences_detailed_path : Path
+            path of the 'sentences_detailed.csv' weekly dump file
+        sentence_blacklist : list
+            the integer ids of the sentences that are not taken
+            into account for this counting
+        buffer_length : int, optional
+            the maximum number of n-grams for which counts are kept in RAM,
+            by default 5000000
+            Note thet process speed mainly depends on the amount of data
+            written to disk and consequently increases with
+            the buffer size
+        """
+        # delete older database found at this path
+        if self._fp.exists():
+            print(f"Warning: the previous counter data will be overwritten")
+            self._fp.unlink()
+            self._init_db()
 
-    wrong_flags = {}
-    if tags_path:
-        wrong_flags = get_sentences_with_tag(tags_path, "@change flag")
+        user_lang_score = defaultdict(int)
+        for n in range(UP_TO_N_GRAM, 1, -1):
+            table_name = f"{TABLE_NGRAM}{n}"
+            lang_ngram_cnt = defaultdict(lambda: defaultdict(int))
+            with open(sentences_detailed_path, "r", encoding="utf-8") as f:
+                for line_id, line in enumerate(f):
+                    self._print_status(line_id, gram_length=n)
+                    try:
+                        fields = line.rstrip().split("\t")
+                        sent_id, lang, text, user = fields[:4]
+                    except IndexError:
+                        print(f"Skipped erroneous line {line_id}: {line}")
+                        continue
 
-    user_lang_nbr_ngram = defaultdict(int)
-    for size in range(UP_TO_N_GRAM, 1, -1):
-        hyper_lang_ngram = defaultdict(lambda: defaultdict(int))
-        hyper_lang_nbr_ngram = defaultdict(int)
+                    # we ignore the sentence with an unset language
+                    if lang == "\\N" or lang == "":
+                        continue
 
-        line_number = 0
-        input.seek(0)
-        for line in input:
-            if line_number % 10000 == 0:
-                print_status_line(size, line_number)
+                    # we ignore the sentence with wrong flag
+                    if int(sent_id) in sentence_blacklist:
+                        continue
 
-            line_number += 1
-            try:
-                cols = line.rstrip().split("\t")
-                sentence_id, lang, text, user = cols[:4]
-            except IndexError:
-                print(
-                    "Skipped erroneous line {}: {}".format(line_number, line)
+                    # update user contribution score
+                    user_lang_score[(user, lang)] += len(text)
+
+                    # increment hit counts for each ngram in the sentence
+                    for i in range(len(text) - n + 1):
+                        ngram = text[i : i + n]
+                        lang_ngram_cnt[lang][ngram] += 1
+
+                    # if buffer is full save it into table and then empty it
+                    tot_ngrams = sum(len(v) for v in lang_ngram_cnt.values())
+                    if tot_ngrams >= buffer_length:
+                        for lang, ngram_hits in lang_ngram_cnt.items():
+                            self._upsert_hits(ngram_hits, lang, table_name)
+                        lang_ngram_cnt = defaultdict(lambda: defaultdict(int))
+
+            # move ngram hits from memory to table
+            for lang, ngram_hits in lang_ngram_cnt.items():
+                self._upsert_hits(ngram_hits, lang, table_name)
+
+            self._print_status(line_id, gram_length=n, force=True)
+            print(" done")
+
+    def _init_db(self):
+
+        conn = sqlite3.connect(self._fp)
+        with conn:
+            # some optimization to make connection faster
+            conn.execute("PRAGMA journal_mode=MEMORY;")
+            conn.execute("PRAGMA temp_store=MEMORY;")
+
+        with conn:
+            # create a table for each n-gram type counts
+            for n in range(FROM_N_GRAM, UP_TO_N_GRAM + 1):
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS %s (
+                    'gram' text not null,
+                    'lang'text not null,
+                    'hit'  int not null,
+                    PRIMARY KEY("gram","lang")
+                    );
+                    """
+                    % (TABLE_NGRAM + str(n))
                 )
-                continue
+            # create a table for storing the sentences counts of users
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS %s (
+                    'user' text not null,
+                    'lang' text not null ,
+                    'total' int not null default 0
+                );
+                """
+                % (TABLE_USR_STAT)
+            )
 
-            # we ignore the sentence with an unset language
-            if lang == "\\N" or lang == "":
-                continue
+        return conn
 
-            # we ignore the sentence with wrong flag
-            if sentence_id in wrong_flags:
-                continue
+    def _upsert_hits(self, ngram_hits, lang, table_name):
+        """Update n-gram hit count values in this table"""
+        with self._conn:
+            for ngram, hits in ngram_hits.items():
+                ngram = ngram.replace("'", "''")
+                sql = (
+                    f"INSERT INTO {table_name} VALUES ('{ngram}', '{lang}', {hits}) "
+                    f"ON CONFLICT (gram, lang) DO UPDATE SET hit = hit + {hits};"
+                )
+                self._conn.execute(sql)
+            self._conn.execute("PRAGMA shrink_memory;")
 
-            # update counts
-            user_lang_nbr_ngram[(user, lang)] += len(text)
-            nbr_ngram_line = len(text) - size
-            if nbr_ngram_line > 0:
-                hyper_lang_nbr_ngram[lang] += nbr_ngram_line
-                for i in range(nbr_ngram_line + 1):
-                    ngram = text[i : i + size]
-                    hyper_lang_ngram[lang][ngram] += 1
+    def _insert_user_stats(self, user_lang_score):
+        """Insert user language contribution scores into table"""
+        print("Inserting user stats...")
+        with self._conn:
+            self._conn.execute("PRAGMA shrink_memory;")
+            for (user, lang), hit in user_lang_score.items():
+                self._conn.execute(
+                    "INSERT INTO %s VALUES (?,?,?);" % (TABLE_USR_STAT),
+                    (user, lang, hit),
+                )
+            self._conn.execute("PRAGMA shrink_memory;")
 
-        print_status_line(size, line_number)
-        print(" done".format(line_number))
+    @staticmethod
+    def _print_status(line_number, gram_length, force=False):
+        """Keep track of n-gram counting progress"""
+        if line_number % 10000 == 0 or force:
+            msg = (
+                f"\rGenerating ngrams of size {gram_length} "
+                f"(reading CSV file... {line_number} lines)"
+            )
+            print(msg, end="")
+            sys.stdout.flush()
 
-        print("Inserting ngrams of size {}...".format(size))
+    @property
+    def path(self):
 
-        table = TABLE_NGRAM + str(size)
-        for lang, currentLangNgram in hyper_lang_ngram.items():
-            for ngram, hit in currentLangNgram.items():
-                freq = float(hit) / hyper_lang_nbr_ngram[lang]
-
-                if lang in IDEOGRAM_LANGS:
-                    if freq > IDEOGRAM_NGRAM_FREQ_LIMIT:
-                        c.execute(
-                            INSERT_NGRAM % (table), (ngram, lang, hit, freq)
-                        )
-                else:
-                    if freq > NGRAM_FREQ_LIMIT:
-                        c.execute(
-                            INSERT_NGRAM % (table), (ngram, lang, hit, freq)
-                        )
-            conn.commit()
-
-    print("Inserting user stats...")
-    for (user, lang), hit in user_lang_nbr_ngram.items():
-        if hit > USR_LANG_LIMIT:
-            c.execute(INSERT_USR_STAT % (TABLE_USR_STAT), (user, lang, hit))
-    conn.commit()
-    c.close()
+        return self._fp
 
 
-def create_indexes_db(database_path):
-    """Add indexes on the database to make request faster
+class TatodetectDB:
+    def __init__(self, db_path: Path) -> None:
+        """
+        Parameters
+        ----------
+        db_path : Path
+            the location of the sqlite databse
+        """
+        self._fp = db_path
 
-    Parameters
-    ----------
-    database_path : str
-        the path of the Tatodetect sqlite database
-    """
-    conn = sqlite3.connect(database_path)
-    conn.isolation_level = "EXCLUSIVE"
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute("PRAGMA page_size=627680;")
-    c.execute("PRAGMA default_cache_size=320000;")
-    c.execute("PRAGMA synchronous=OFF;")
-    c.execute("PRAGMA count_changes=OFF;")
-    c.execute("PRAGMA temp_store=MEMORY;")
-    c.execute("PRAGMA journal_mode=MEMORY;")
+        self._conn = self._init_db()
 
-    for i in range(2, UP_TO_N_GRAM + 1):
+    def extract_top_from(self, ngram_counter_db: NgramCounterDB) -> None:
+        """Copy most significant content
+        from an n-gram counter sqlite database
+
+        Parameters
+        ----------
+        ngram_counter_db : NgramCounterDB
+            a database containing all Tatoeba n-grams counts
+        """
+        # delete older database found at this path
+        if self._fp.exists():
+            print(f"Warning: the previous top data will be overwritten")
+            self._fp.unlink()
+            self._conn = self._init_db()
+
+        c = self._conn.cursor()
+
+        # attach top database to enable data transfert
+        c.execute(f"ATTACH DATABASE '{ngram_counter_db.path}' AS counter")
+
+        for n in range(FROM_N_GRAM, UP_TO_N_GRAM + 1):
+            print(f"Extracting top {n}-grams from counter database")
+            c.execute(
+                f"""
+                INSERT INTO main.grams{n}
+                SELECT
+                  gram,
+                  counter.grams{n}.lang,
+                  hit,
+                  CAST(hit AS FLOAT) / CAST(lang_ngram_tots.tot AS FLOAT) AS percent
+                FROM counter.grams{n}
+                INNER JOIN (
+                SELECT
+                  lang, 
+                  SUM(hit) AS tot
+                FROM counter.grams{n}
+                GROUP BY lang) AS lang_ngram_tots
+                ON counter.grams{n}.lang = lang_ngram_tots.lang
+                WHERE percent > (
+                CASE
+                  WHEN counter.grams{n}.lang IN {IDEOGRAM_LANGS}
+                  THEN {IDEOGRAM_NGRAM_FREQ_LIMIT} ELSE {NGRAM_FREQ_LIMIT}
+                END)
+                """
+            )
+
+        print(f"Extracting top contributors")
         c.execute(
+            f"""
+            INSERT INTO main.users_langs
+            SELECT * FROM counter.users_langs
+            WHERE total > {USR_LANG_LIMIT}
             """
-            CREATE INDEX
-                gram_grams%d_idx
-            ON grams%d(gram);
-            """
-            % (i, i)
         )
-    c.execute(
-        """
-        CREATE UNIQUE INDEX
-            lang_user_users_langs_idx
-        ON
-            %s(lang,user);
-        """
-        % (TABLE_USR_STAT)
-    )
-    c.execute(
-        """
-        CREATE INDEX
-           user_%s_idx
-        ON %s(user);
-        """
-        % (TABLE_USR_STAT, TABLE_USR_STAT)
-    )
-    conn.commit()
-    c.close()
+
+        self._conn.commit()
+
+        c.execute("DETACH DATABASE counter")
+
+        c.close()
+
+    def _init_db(self):
+
+        conn = sqlite3.connect(self._fp)
+        with conn:
+            # create a table for each n-gram type counts
+            for n in range(FROM_N_GRAM, UP_TO_N_GRAM + 1):
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS %s (
+                    'gram' text not null,
+                    'lang'text not null,
+                    'hit'  int not null,
+                    'percent' float not null default 0,
+                    PRIMARY KEY("gram","lang")
+                    );
+                    """
+                    % (TABLE_NGRAM + str(n))
+                )
+            # create a table for storing the sentences counts of users
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS %s (
+                    'user' text not null,
+                    'lang' text not null ,
+                    'total' int not null default 0
+                );
+                """
+                % (TABLE_USR_STAT)
+            )
+
+        return conn
 
 
-def get_sentences_with_tag(tags_path, tag_name):
-    """Fetch ids of all Tatoeba sentences tagged with this tag
+def get_sentences_with_tag(tags_path: Path, tag_name: str) -> set:
+    """Get the ids of the Tatoeba sentences with this tag
 
     Parameters
     ----------
-    tags_path : str
+    tags_path : Path
         the path of the Tatoeba tags.csv dump file
     tag_name : str
         the tag for which tagged sentences are looked for
 
     Returns
     -------
-    dict
-        the ids of the tagged sentences mapping to True
+    set
+        the integer ids of the tagged sentences mapping to True
     """
     tagged = set()
     try:
@@ -260,32 +347,14 @@ def get_sentences_with_tag(tags_path, tag_name):
             for line in f:
                 sentence_id, tag = line.rstrip().split("\t")
                 if tag == tag_name:
-                    tagged.add(sentence_id)
+                    tagged.add(int(sentence_id))
     except IndexError:
         pass
 
     return tagged
 
 
-def print_status_line(size, line_number):
-    """Print the progress of the ngram counting
-
-    Parameters
-    ----------
-    size : int
-        the size of the ngram (i.e. 3 for 3-grams)
-    line_number : int
-        the index of the processed line in sentences csv file
-    """
-    msg = (
-        f"\rGenerating ngrams of size {size} "
-        f"(reading CSV file... {line_number} lines)"
-    )
-    print(msg, end="")
-    sys.stdout.flush()
-
-
-if __name__ == "__main__":
+def main():
 
     if len(sys.argv) < 3:
         fnames = "sentences_detailed.csv", "ngrams.db", "tags.csv"
@@ -293,22 +362,24 @@ if __name__ == "__main__":
         print(msg)
         sys.exit(1)
 
-    sentences_path = sys.argv[1]
-    database_path = sys.argv[2]
+    sentences_detailed_path = Path(sys.argv[1])
+    database_path = Path(sys.argv[2])
     try:
-        tags_path = sys.argv[3]
+        tags_path = Path(sys.argv[3])
     except IndexError:
         tags_path = None
 
-    # we first delete the old database
-    if os.path.isfile(database_path):
-        os.remove(database_path)
+    sentence_blacklist = get_sentences_with_tag(tags_path, "@change flag")
 
-    print("Start generating database...")
-    generate_db(database_path)
+    ngram_counter_path = database_path.parent.joinpath("ngram_counter.db")
+    ngram_counter_db = NgramCounterDB(ngram_counter_path)
+    ngram_counter_db.count_ngram_hits(
+        sentences_detailed_path, sentence_blacklist, buffer_length=5000000
+    )
+    tatodetect_db = TatodetectDB(database_path)
+    tatodetect_db.extract_top_from(ngram_counter_db)
 
-    print("generating n-grams...")
-    generate_n_grams(database_path, sentences_path, tags_path)
 
-    print("creating indexes...")
-    create_indexes_db(database_path)
+if __name__ == "__main__":
+
+    main()
