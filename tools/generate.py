@@ -36,10 +36,10 @@ NGRAM_FREQ_LIMIT = 0.00001
 # number of 1-gram a user must have submitted in one language to
 # be considered as possibly contributing in that languages
 # note that this number is currently purely arbitrary
-USR_LANG_LIMIT = 400
+MIN_USER_CONTRIB_IN_LANG = 100
 # we will generate the ngram from 2-gram to X-grams
-FROM_N_GRAM = 2
-UP_TO_N_GRAM = 5
+MIN_NGRAM_SIZE = 2
+MAX_NGRAM_SIZE = 5
 # some names of the table in the database
 TABLE_NGRAM = "grams"
 TABLE_STAT = "langstat"
@@ -52,7 +52,7 @@ class NgramCounterDB:
     The occurrence counts of every n-gram found in the
     Tatoeba corpus
 
-    Statistics realated to user contributions to Tatoeba
+    Statistics related to user contributions to Tatoeba
     in various languages
     """
 
@@ -61,7 +61,7 @@ class NgramCounterDB:
         Parameters
         ----------
         db_path : Path
-            the location of the sqlite databse
+            the location of the sqlite database
         """
         self._fp = db_path
 
@@ -73,11 +73,13 @@ class NgramCounterDB:
         sentence_blacklist: list,
         buffer_length: int = 5000000,
     ) -> None:
-        """Count n-grams occurrences for each Tatoeba language
-        A contribution score equal to sum(len(sentences)) * (max_n - 1)
-        is also computed for every language a user contributed to
+        """Count n-grams' occurrences for each Tatoeba language
 
-        All results are gradually saved into database tables
+        A contribution score equal to sum(len(sentences))
+        is also computed for every language a user contributed to.
+
+        All results are gradually saved into database tables in
+        order to mitigate the memory footprint of the process.
 
         Parameters
         ----------
@@ -90,17 +92,16 @@ class NgramCounterDB:
             the maximum number of n-grams for which counts are kept in RAM,
             by default 5000000
             Note thet process speed mainly depends on the amount of data
-            written to disk and consequently increases with
-            the buffer size
+            written to disk and consequently increases with the buffer size.
         """
         # delete older database found at this path
         if self._fp.exists():
-            print(f"Warning: the previous counter data will be overwritten")
+            print(f"Warning, the older n-gram counter data will be overwritten")
             self._fp.unlink()
             self._init_db()
 
         user_lang_score = defaultdict(int)
-        for n in range(UP_TO_N_GRAM, 1, -1):
+        for n in range(MAX_NGRAM_SIZE, 1, -1):
             table_name = f"{TABLE_NGRAM}{n}"
             lang_ngram_cnt = defaultdict(lambda: defaultdict(int))
             with open(sentences_detailed_path, "r", encoding="utf-8") as f:
@@ -121,8 +122,9 @@ class NgramCounterDB:
                     if int(sent_id) in sentence_blacklist:
                         continue
 
-                    # update user contribution score
-                    user_lang_score[(user, lang)] += len(text)
+                    # update user contribution score during last reader loop
+                    if n == MIN_NGRAM_SIZE:
+                        user_lang_score[(user, lang)] += len(text)
 
                     # increment hit counts for each ngram in the sentence
                     for i in range(len(text) - n + 1):
@@ -153,7 +155,7 @@ class NgramCounterDB:
 
         with conn:
             # create a table for each n-gram type counts
-            for n in range(FROM_N_GRAM, UP_TO_N_GRAM + 1):
+            for n in range(MIN_NGRAM_SIZE, MAX_NGRAM_SIZE + 1):
                 conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS %s (
@@ -252,7 +254,7 @@ class TatodetectDB:
         # attach top database to enable data transfert
         c.execute(f"ATTACH DATABASE '{ngram_counter_db.path}' AS counter")
 
-        for n in range(FROM_N_GRAM, UP_TO_N_GRAM + 1):
+        for n in range(MIN_NGRAM_SIZE, MAX_NGRAM_SIZE + 1):
             print(f"Extracting top {n}-grams from counter database")
             c.execute(
                 f"""
@@ -283,7 +285,7 @@ class TatodetectDB:
             f"""
             INSERT INTO main.users_langs
             SELECT * FROM counter.users_langs
-            WHERE total > {USR_LANG_LIMIT}
+            WHERE total > {MIN_USER_CONTRIB_IN_LANG}
             """
         )
 
@@ -298,7 +300,7 @@ class TatodetectDB:
         conn = sqlite3.connect(self._fp)
         with conn:
             # create a table for each n-gram type counts
-            for n in range(FROM_N_GRAM, UP_TO_N_GRAM + 1):
+            for n in range(MIN_NGRAM_SIZE, MAX_NGRAM_SIZE + 1):
                 conn.execute(
                     """
                     CREATE TABLE IF NOT EXISTS %s (
@@ -354,7 +356,7 @@ def get_sentences_with_tag(tags_path: Path, tag_name: str) -> set:
     return tagged
 
 
-def main():
+if __name__ == "__main__":
 
     if len(sys.argv) < 3:
         fnames = "sentences_detailed.csv", "ngrams.db", "tags.csv"
@@ -378,8 +380,3 @@ def main():
     )
     tatodetect_db = TatodetectDB(database_path)
     tatodetect_db.extract_top_from(ngram_counter_db)
-
-
-if __name__ == "__main__":
-
-    main()
